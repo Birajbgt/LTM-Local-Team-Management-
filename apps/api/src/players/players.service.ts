@@ -3,6 +3,9 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -29,6 +32,19 @@ export class PlayersService {
     return player;
   }
 
+  async findOne(id: string) {
+    const player = await this.prisma.player.findUnique({
+      where: { id },
+      include: { team: true, user: true, playerStats: true },
+    });
+
+    if (!player) {
+      throw new NotFoundException('Player not found.');
+    }
+
+    return player;
+  }
+
   async create(data: {
     name: string;
     role: 'BATSMAN' | 'BOWLER' | 'ALL_ROUNDER' | 'WICKET_KEEPER';
@@ -44,17 +60,29 @@ export class PlayersService {
     email: string;
     teamId?: string;
   }) {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: data.email.toLowerCase() },
+    const normalizedEmail = data.email.trim().toLowerCase();
+    const nameParts = data.name.trim().split(/\s+/);
+    const derivedFirstName = data.firstName ?? nameParts[0] ?? data.name.trim();
+    const derivedLastName =
+      data.lastName ?? (nameParts.length > 1 ? nameParts.slice(1).join(' ') : null);
+
+    let existingUser = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
     });
 
     if (!existingUser) {
-      throw new BadRequestException(
-        'User not found. Register the account before creating a player profile.',
-      );
+      const passwordHash = await bcrypt.hash('player123', 10);
+      existingUser = await this.prisma.user.create({
+        data: {
+          email: normalizedEmail,
+          password: passwordHash,
+          name: data.name,
+          role: UserRole.PLAYER,
+        },
+      });
     }
 
-    if (existingUser.role !== 'PLAYER') {
+    if (existingUser.role !== UserRole.PLAYER) {
       throw new BadRequestException('This user is not a player role.');
     }
 
@@ -74,8 +102,8 @@ export class PlayersService {
         matchesPlayed: data.matchesPlayed,
         totalRuns: data.totalRuns,
         totalWickets: data.totalWickets,
-        firstName: data.firstName ?? data.name.split(' ')[0] ?? data.name,
-        lastName: data.lastName ?? data.name.split(' ').slice(1).join(' ') || null,
+        firstName: derivedFirstName,
+        lastName: derivedLastName,
         jerseyNumber: data.jerseyNumber,
         battingStyle: data.battingStyle,
         bowlingStyle: data.bowlingStyle,
@@ -95,7 +123,12 @@ export class PlayersService {
       matchesPlayed?: number;
       totalRuns?: number;
       totalWickets?: number;
+      firstName?: string;
+      lastName?: string;
       jerseyNumber?: number;
+      battingStyle?: string;
+      bowlingStyle?: string;
+      teamId?: string | null;
     },
   ) {
     const player = await this.prisma.player.findUnique({ where: { id } });
@@ -104,14 +137,19 @@ export class PlayersService {
       throw new NotFoundException('Player not found.');
     }
 
+    const nameParts = data.name?.trim().split(/\s+/) ?? [];
+    const derivedFirstName = data.firstName ?? nameParts[0] ?? undefined;
+    const derivedLastName =
+      data.lastName ?? (nameParts.length > 1 ? nameParts.slice(1).join(' ') : null);
+
     return this.prisma.player.update({
       where: { id },
       data: {
         ...data,
         ...(data.name && !data.firstName && !data.lastName
           ? {
-              firstName: data.name.split(' ')[0] ?? data.name,
-              lastName: data.name.split(' ').slice(1).join(' ') || null,
+              firstName: derivedFirstName,
+              lastName: derivedLastName,
             }
           : {}),
       },

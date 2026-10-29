@@ -15,8 +15,12 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return the api health payload', () => {
+      expect(appController.getHello()).toMatchObject({
+        service: 'ltm-api',
+        status: 'online',
+        message: 'Welcome to the LTM monorepo API',
+      });
     });
   });
 });

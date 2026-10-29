@@ -135,6 +135,11 @@ class UpdatePlayerDto {
   @IsInt()
   @ApiProperty({ example: 9, required: false })
   jerseyNumber?: number;
+
+  @IsOptional()
+  @IsString()
+  @ApiProperty({ example: 'team-123', required: false })
+  teamId?: string;
 }
 
 @ApiTags('Players')
@@ -158,6 +163,15 @@ export class PlayersController {
   @ApiOperation({ summary: 'Get the current player profile and stats' })
   async me(@CurrentUser() user: { id: string }) {
     return this.playersService.findByUserId(user.id);
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.TEAM, UserRole.PLAYER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a player by id' })
+  async findOne(@Param('id') id: string) {
+    return this.playersService.findOne(id);
   }
 
   @Post()

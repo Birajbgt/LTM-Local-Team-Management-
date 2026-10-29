@@ -51,6 +51,15 @@ export class TeamsController {
     return this.teamsService.findAll();
   }
 
+  @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.TEAM)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a team by id' })
+  async findOne(@Param('id') id: string) {
+    return this.teamsService.findOne(id);
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.TEAM)

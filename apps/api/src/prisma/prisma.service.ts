@@ -6,8 +6,6 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
-  player: any;
-  statUpgradeRequest: any;
   async onModuleInit() {
     await this.$connect();
   }

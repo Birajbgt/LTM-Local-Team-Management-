@@ -34,7 +34,7 @@ const topMatches = [
 export default function AdminDashboardPage() {
   const [teams, setTeams] = useState<Array<{ id: string; name: string; logoUrl?: string }>>([]);
   const [players, setPlayers] = useState<Array<{ id: string; name: string; role?: string; profileImageUrl?: string; team?: { id?: string; name?: string } | null; user?: { email?: string }; basePrice?: number; matchesPlayed?: number; totalRuns?: number; totalWickets?: number }>>([]);
-  const [tickets, setTickets] = useState<Array<{ id: string; status?: string; fieldName?: string; currentValue?: string; requestedValue?: string; reason?: string; player?: { name?: string }; requestedBy?: { name?: string; email?: string } }>>([]);
+  const [tickets, setTickets] = useState<Array<{ id: string; status?: string; fieldName?: string; currentValue?: string; requestedValue?: string; reason?: string; player?: { id?: string; name?: string }; requestedBy?: { name?: string; email?: string } }>>([]);
   const [isDashboardLoading, setIsDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [teamForm, setTeamForm] = useState({ name: "", logoUrl: "" });
@@ -69,7 +69,7 @@ export default function AdminDashboardPage() {
 
       const teamsResult = (await teamsResponse.json().catch(() => ({ data: [] }))) as { data?: Array<{ id: string; name: string; logoUrl?: string }> };
       const playersResult = (await playersResponse.json().catch(() => ({ data: [] }))) as { data?: Array<{ id: string; name: string; role?: string; profileImageUrl?: string; team?: { id?: string; name?: string } | null; user?: { email?: string }; basePrice?: number; matchesPlayed?: number; totalRuns?: number; totalWickets?: number }> };
-      const ticketsResult = (await ticketsResponse.json().catch(() => ({ data: [] }))) as { data?: Array<{ id: string; status?: string; fieldName?: string; currentValue?: string; requestedValue?: string; reason?: string; player?: { name?: string }; requestedBy?: { name?: string; email?: string } }> };
+      const ticketsResult = (await ticketsResponse.json().catch(() => ({ data: [] }))) as { data?: Array<{ id: string; status?: string; fieldName?: string; currentValue?: string; requestedValue?: string; reason?: string; player?: { id?: string; name?: string }; requestedBy?: { name?: string; email?: string } }> };
 
       setTeams(Array.isArray(teamsResult.data) ? teamsResult.data : []);
       setPlayers(Array.isArray(playersResult.data) ? playersResult.data : []);
@@ -85,15 +85,28 @@ export default function AdminDashboardPage() {
     void loadDashboardData();
   }, []);
 
+  const pendingTicketsCount = tickets.filter((ticket) => !["APPROVED", "REJECTED"].includes(ticket.status ?? "PENDING")).length;
+
   const summaryCards = useMemo(
     () => [
       { label: "Active Teams", value: String(teams.length), note: teams.length > 0 ? "Live clubs" : "No teams yet" },
       { label: "Registered Players", value: String(players.length), note: players.length > 0 ? "Active roster" : "Awaiting signups" },
       { label: "Top Run Scorer", value: players.length ? `${Math.max(...players.map((player) => Number(player.totalRuns ?? 0)))} runs` : "0 runs", note: "Updated live" },
-      { label: "Open Requests", value: "09", note: "4 pending review" },
+      { label: "Open Requests", value: String(pendingTicketsCount), note: `${pendingTicketsCount === 1 ? "1 pending" : `${pendingTicketsCount} pending`} review` },
     ],
-    [players, teams],
+    [pendingTicketsCount, players, teams],
   );
+
+  const playerTicketCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    tickets.forEach((ticket) => {
+      const key = ticket.player?.id ?? ticket.player?.name ?? "unknown";
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+
+    return counts;
+  }, [tickets]);
 
   const bestPlayers = useMemo(
     () =>
@@ -569,6 +582,56 @@ export default function AdminDashboardPage() {
         </div>
 
         <div className="space-y-8">
+          <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-2xl font-semibold text-white">Players Overview</h2>
+              <span className="text-xs uppercase tracking-[0.2em] text-emerald-400">Roster</span>
+            </div>
+
+            <div className="space-y-3">
+              {players.length === 0 ? (
+                <p className="text-sm text-slate-400">No players registered yet.</p>
+              ) : (
+                players.map((player) => {
+                  const ticketCount = playerTicketCounts.get(player.id) ?? 0;
+
+                  return (
+                    <div key={player.id} className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-white">{player.name}</p>
+                          <p className="text-xs text-slate-400">{player.role ?? "BATSMAN"} · {player.team?.name ?? "Unassigned"}</p>
+                        </div>
+                        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-amber-300">
+                          {ticketCount} ticket{ticketCount === 1 ? "" : "s"}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-300">
+                        <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2">
+                          <div className="text-slate-400">Runs</div>
+                          <div className="mt-1 font-semibold text-white">{player.totalRuns ?? 0}</div>
+                        </div>
+                        <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2">
+                          <div className="text-slate-400">Wickets</div>
+                          <div className="mt-1 font-semibold text-white">{player.totalWickets ?? 0}</div>
+                        </div>
+                        <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2">
+                          <div className="text-slate-400">Matches</div>
+                          <div className="mt-1 font-semibold text-white">{player.matchesPlayed ?? 0}</div>
+                        </div>
+                        <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2">
+                          <div className="text-slate-400">Base</div>
+                          <div className="mt-1 font-semibold text-white">{player.basePrice ?? 0}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
           <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-2xl font-semibold text-white">Best Players</h2>

@@ -33,24 +33,33 @@ export default async function DashboardLayout({
             >
               Overview
             </Link>
-            <Link
-              href="/dashboard/admin"
-              className="rounded-full border border-[#d9b768]/20 px-3 py-1.5 text-sm text-slate-200 transition hover:border-[#d9b768] hover:text-[#f2d58a]"
-            >
-              Admin
-            </Link>
-            <Link
-              href="/dashboard/team"
-              className="rounded-full border border-[#d9b768]/20 px-3 py-1.5 text-sm text-slate-200 transition hover:border-[#d9b768] hover:text-[#f2d58a]"
-            >
-              Team / Club
-            </Link>
-            <Link
-              href="/dashboard/player"
-              className="rounded-full border border-[#d9b768]/20 px-3 py-1.5 text-sm text-slate-200 transition hover:border-[#d9b768] hover:text-[#f2d58a]"
-            >
-              Player
-            </Link>
+
+            {currentUser?.role === "admin" ? (
+              <Link
+                href="/dashboard/admin"
+                className="rounded-full border border-[#d9b768]/20 px-3 py-1.5 text-sm text-slate-200 transition hover:border-[#d9b768] hover:text-[#f2d58a]"
+              >
+                Admin
+              </Link>
+            ) : null}
+
+            {currentUser?.role === "team" ? (
+              <Link
+                href="/dashboard/team"
+                className="rounded-full border border-[#d9b768]/20 px-3 py-1.5 text-sm text-slate-200 transition hover:border-[#d9b768] hover:text-[#f2d58a]"
+              >
+                Team / Club
+              </Link>
+            ) : null}
+
+            {currentUser?.role === "player" ? (
+              <Link
+                href="/dashboard/player"
+                className="rounded-full border border-[#d9b768]/20 px-3 py-1.5 text-sm text-slate-200 transition hover:border-[#d9b768] hover:text-[#f2d58a]"
+              >
+                Player
+              </Link>
+            ) : null}
           </nav>
 
           <div className="flex items-center gap-3">

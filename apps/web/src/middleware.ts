@@ -4,8 +4,8 @@ const publicPaths = ["/", "/login"];
 const roleAccess: Record<string, string[]> = {
   "/dashboard": ["admin", "team", "player"],
   "/dashboard/admin": ["admin"],
-  "/dashboard/team": ["admin", "team"],
-  "/dashboard/player": ["admin", "player"],
+  "/dashboard/team": ["team"],
+  "/dashboard/player": ["player"],
 };
 
 function getRoleFromToken(token: string): string | null {

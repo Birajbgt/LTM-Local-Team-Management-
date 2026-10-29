@@ -7,6 +7,7 @@ describe('AuthService', () => {
     user: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
     },
   };
 
@@ -58,5 +59,48 @@ describe('AuthService', () => {
     );
     expect(user.email).toBe('admin@ltm.com');
     expect(user.role).toBe(UserRole.ADMIN);
+  });
+
+  it('updates the user email and hashes a new password', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'old@ltm.com',
+      name: 'Player One',
+      role: UserRole.PLAYER,
+      password: 'existing-hash',
+    });
+
+    prisma.user.update.mockResolvedValue({
+      id: 'user-1',
+      email: 'new@ltm.com',
+      name: 'Player One',
+      role: UserRole.PLAYER,
+      password: 'hashed-new-password',
+    });
+
+    jwtService.signAsync.mockResolvedValue('fresh-token');
+
+    const service = new AuthService(prisma as any, jwtService as any);
+
+    const result = await service.updateProfile('user-1', {
+      email: 'new@ltm.com',
+      password: 'newpass123',
+    });
+
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+    });
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'user-1' },
+        data: expect.objectContaining({
+          email: 'new@ltm.com',
+          password: expect.any(String),
+        }),
+      }),
+    );
+    expect(prisma.user.update.mock.calls[0][0].data.password).not.toBe('newpass123');
+    expect(result.accessToken).toBe('fresh-token');
+    expect(result.user.email).toBe('new@ltm.com');
   });
 });

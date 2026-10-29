@@ -55,6 +55,7 @@ model Team {
   shortName   String?  @unique
   city        String?
   coachName   String?
+  logoUrl     String?
   users       User[]   @relation("TeamMembers")
   players     Player[]
   homeMatches Match[]  @relation("HomeTeam")
@@ -64,26 +65,27 @@ model Team {
 }
 
 model Player {
-  id              String                @id @default(cuid())
-  userId          String                @unique
-  user            User                  @relation(fields: [userId], references: [id])
-  teamId          String?
-  team            Team?                 @relation(fields: [teamId], references: [id])
-  name            String
-  role            PlayerRole            @default(BATSMAN)
-  basePrice       Int                   @default(0)
-  matchesPlayed   Int                   @default(0)
-  totalRuns       Int                   @default(0)
-  totalWickets    Int                   @default(0)
-  firstName       String?
-  lastName        String?
-  jerseyNumber    Int?
-  battingStyle    String?
-  bowlingStyle    String?
-  playerStats     PlayerStat[]
-  upgradeRequests StatUpgradeRequest[]
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  id               String                @id @default(cuid())
+  userId           String                @unique
+  user             User                  @relation(fields: [userId], references: [id])
+  teamId           String?
+  team             Team?                 @relation(fields: [teamId], references: [id])
+  name             String
+  role             PlayerRole            @default(BATSMAN)
+  profileImageUrl  String?
+  basePrice        Int                   @default(0)
+  matchesPlayed    Int                   @default(0)
+  totalRuns        Int                   @default(0)
+  totalWickets     Int                   @default(0)
+  firstName        String?
+  lastName         String?
+  jerseyNumber     Int?
+  battingStyle     String?
+  bowlingStyle     String?
+  playerStats      PlayerStat[]
+  upgradeRequests  StatUpgradeRequest[]
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 }
 
 model Match {

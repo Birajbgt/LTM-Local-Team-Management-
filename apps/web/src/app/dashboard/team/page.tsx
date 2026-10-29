@@ -87,6 +87,14 @@ export default async function TeamDashboardPage() {
                     <div key={player.id}>{player.name}</div>
                   ))}
                 </div>
+                <div className="mt-5">
+                  <a
+                    href={`/dashboard/team/${team.id}`}
+                    className="inline-flex rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-200 transition hover:border-cyan-400"
+                  >
+                    View details
+                  </a>
+                </div>
               </article>
             ))
           )}

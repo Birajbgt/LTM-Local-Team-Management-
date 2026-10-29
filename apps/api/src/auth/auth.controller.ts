@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -59,6 +60,19 @@ class RegisterDto {
   role?: UserRole;
 }
 
+class UpdateProfileDto {
+  @IsOptional()
+  @IsEmail()
+  @ApiProperty({ example: 'new.email@ltm.local', required: false })
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @ApiProperty({ example: 'newpass123', required: false })
+  password?: string;
+}
+
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
@@ -76,6 +90,18 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'JWT access token and user payload.' })
   async login(@Body() body: LoginDto) {
     return this.authService.login(body.email, body.password);
+  }
+
+  @Patch('profile')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.TEAM, UserRole.PLAYER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update the authenticated user email and/or password' })
+  async updateProfile(
+    @CurrentUser() user: { id: string },
+    @Body() body: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(user.id, body);
   }
 
   @Get('me')

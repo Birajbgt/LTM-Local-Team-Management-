@@ -15,6 +15,16 @@ const upcomingMatches = [
   { home: "Lucknow Lions", away: "Hyderabad Hawks", date: "Nov 08", venue: "Ekana Stadium" },
 ];
 
+const toNonNegativeNumber = (value: string) => {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor(parsed));
+};
+
 const topMatches = [
   { title: "Mumbai vs Chennai", format: "T20", status: "Trending" },
   { title: "Delhi vs Bengaluru", format: "League", status: "High Demand" },
@@ -22,11 +32,12 @@ const topMatches = [
 ];
 
 export default function AdminDashboardPage() {
-  const [teams, setTeams] = useState<Array<{ id: string; name: string }>>([]);
-  const [players, setPlayers] = useState<Array<{ id: string; name: string; role?: string; team?: { id?: string; name?: string } | null; user?: { email?: string }; basePrice?: number; matchesPlayed?: number; totalRuns?: number; totalWickets?: number }>>([]);
+  const [teams, setTeams] = useState<Array<{ id: string; name: string; logoUrl?: string }>>([]);
+  const [players, setPlayers] = useState<Array<{ id: string; name: string; role?: string; profileImageUrl?: string; team?: { id?: string; name?: string } | null; user?: { email?: string }; basePrice?: number; matchesPlayed?: number; totalRuns?: number; totalWickets?: number }>>([]);
+  const [tickets, setTickets] = useState<Array<{ id: string; status?: string; fieldName?: string; currentValue?: string; requestedValue?: string; reason?: string; player?: { name?: string }; requestedBy?: { name?: string; email?: string } }>>([]);
   const [isDashboardLoading, setIsDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
-  const [teamForm, setTeamForm] = useState({ name: "" });
+  const [teamForm, setTeamForm] = useState({ name: "", logoUrl: "" });
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [playerForm, setPlayerForm] = useState({
     name: "",
@@ -37,25 +48,32 @@ export default function AdminDashboardPage() {
     totalRuns: "",
     totalWickets: "",
     teamId: "",
+    profileImageUrl: "",
   });
+  const [profileForm, setProfileForm] = useState({ email: "", password: "" });
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [teamStatus, setTeamStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [playerStatus, setPlayerStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [profileStatus, setProfileStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isSubmittingTeam, setIsSubmittingTeam] = useState(false);
   const [isSubmittingPlayer, setIsSubmittingPlayer] = useState(false);
+  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
 
   const loadDashboardData = async () => {
     try {
-      const [teamsResponse, playersResponse] = await Promise.all([
+      const [teamsResponse, playersResponse, ticketsResponse] = await Promise.all([
         fetch("/api/admin/teams", { cache: "no-store" }),
         fetch("/api/admin/players", { cache: "no-store" }),
+        fetch("/api/stat-upgrades", { cache: "no-store" }),
       ]);
 
-      const teamsResult = (await teamsResponse.json().catch(() => ({ data: [] }))) as { data?: Array<{ id: string; name: string }> };
-      const playersResult = (await playersResponse.json().catch(() => ({ data: [] }))) as { data?: Array<{ id: string; name: string; role?: string; team?: { id?: string; name?: string } | null; user?: { email?: string }; basePrice?: number; matchesPlayed?: number; totalRuns?: number; totalWickets?: number }> };
+      const teamsResult = (await teamsResponse.json().catch(() => ({ data: [] }))) as { data?: Array<{ id: string; name: string; logoUrl?: string }> };
+      const playersResult = (await playersResponse.json().catch(() => ({ data: [] }))) as { data?: Array<{ id: string; name: string; role?: string; profileImageUrl?: string; team?: { id?: string; name?: string } | null; user?: { email?: string }; basePrice?: number; matchesPlayed?: number; totalRuns?: number; totalWickets?: number }> };
+      const ticketsResult = (await ticketsResponse.json().catch(() => ({ data: [] }))) as { data?: Array<{ id: string; status?: string; fieldName?: string; currentValue?: string; requestedValue?: string; reason?: string; player?: { name?: string }; requestedBy?: { name?: string; email?: string } }> };
 
       setTeams(Array.isArray(teamsResult.data) ? teamsResult.data : []);
       setPlayers(Array.isArray(playersResult.data) ? playersResult.data : []);
+      setTickets(Array.isArray(ticketsResult.data) ? ticketsResult.data : []);
     } catch {
       setDashboardError("Unable to load dashboard data.");
     } finally {
@@ -102,7 +120,9 @@ export default function AdminDashboardPage() {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
-        editingTeamId ? { id: editingTeamId, name: teamForm.name.trim() } : { name: teamForm.name.trim() },
+        editingTeamId
+          ? { id: editingTeamId, name: teamForm.name.trim(), logoUrl: teamForm.logoUrl.trim() || "/logo/ltm.jpg" }
+          : { name: teamForm.name.trim(), logoUrl: teamForm.logoUrl.trim() || "/logo/ltm.jpg" },
       ),
     });
 
@@ -121,7 +141,7 @@ export default function AdminDashboardPage() {
       type: "success",
       message: `${editingTeamId ? "Team updated" : "Team created"} successfully${result.id ? ` (ID: ${result.id})` : ""}.`,
     });
-    setTeamForm({ name: "" });
+    setTeamForm({ name: "", logoUrl: "" });
     setEditingTeamId(null);
     setIsSubmittingTeam(false);
     await loadDashboardData();
@@ -139,10 +159,11 @@ export default function AdminDashboardPage() {
       body: JSON.stringify({
         ...(editingPlayerId ? { id: editingPlayerId } : {}),
         ...playerForm,
-        basePrice: Number(playerForm.basePrice),
-        matchesPlayed: Number(playerForm.matchesPlayed),
-        totalRuns: Number(playerForm.totalRuns),
-        totalWickets: Number(playerForm.totalWickets),
+        profileImageUrl: playerForm.profileImageUrl.trim() || "/images/default-player.svg",
+        basePrice: toNonNegativeNumber(playerForm.basePrice),
+        matchesPlayed: toNonNegativeNumber(playerForm.matchesPlayed),
+        totalRuns: toNonNegativeNumber(playerForm.totalRuns),
+        totalWickets: toNonNegativeNumber(playerForm.totalWickets),
         teamId: playerForm.teamId || undefined,
       }),
     });
@@ -171,9 +192,60 @@ export default function AdminDashboardPage() {
       totalRuns: "",
       totalWickets: "",
       teamId: "",
+      profileImageUrl: "",
     });
     setEditingPlayerId(null);
     setIsSubmittingPlayer(false);
+    await loadDashboardData();
+  };
+
+  const handleProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubmittingProfile(true);
+    setProfileStatus(null);
+
+    const response = await fetch("/api/auth/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: profileForm.email.trim(),
+        password: profileForm.password.trim(),
+      }),
+    });
+
+    const result = (await response.json()) as { message?: string; success?: boolean };
+
+    if (!response.ok || !result.success) {
+      setProfileStatus({
+        type: "error",
+        message: result.message ?? "Unable to update profile.",
+      });
+      setIsSubmittingProfile(false);
+      return;
+    }
+
+    setProfileStatus({
+      type: "success",
+      message: result.message ?? "Profile updated successfully.",
+    });
+    setProfileForm({ email: "", password: "" });
+    setIsSubmittingProfile(false);
+  };
+
+  const handleTicketAction = async (ticketId: string, status: "APPROVED" | "REJECTED") => {
+    const response = await fetch("/api/stat-upgrades", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: ticketId, status }),
+    });
+
+    const result = (await response.json()) as { message?: string; success?: boolean };
+
+    if (!response.ok || !result.success) {
+      setDashboardError(result.message ?? "Unable to update ticket.");
+      return;
+    }
+
     await loadDashboardData();
   };
 
@@ -228,11 +300,32 @@ export default function AdminDashboardPage() {
                   <input
                     id="team-name"
                     value={teamForm.name}
-                    onChange={(event) => setTeamForm({ name: event.target.value })}
+                    onChange={(event) => setTeamForm({ ...teamForm, name: event.target.value })}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none transition focus:border-emerald-500"
                     placeholder="e.g. Kolkata Knight Riders"
                     required
                   />
+                </div>
+
+                <div>
+                  <label htmlFor="team-logo" className="mb-2 block text-sm font-medium text-slate-300">
+                    Team Logo URL
+                  </label>
+                  <input
+                    id="team-logo"
+                    value={teamForm.logoUrl}
+                    onChange={(event) => setTeamForm({ ...teamForm, logoUrl: event.target.value })}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none transition focus:border-emerald-500"
+                    placeholder="/logo/ltm.jpg"
+                  />
+                  <div className="mt-3 flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/70 p-2">
+                    <img
+                      src={teamForm.logoUrl || "/logo/ltm.jpg"}
+                      alt="Team logo preview"
+                      className="h-12 w-12 rounded-lg object-cover"
+                    />
+                    <span className="text-xs text-slate-400">Uses LTM logo by default</span>
+                  </div>
                 </div>
 
                 {teamStatus ? (
@@ -260,7 +353,7 @@ export default function AdminDashboardPage() {
                       type="button"
                       onClick={() => {
                         setEditingTeamId(null);
-                        setTeamForm({ name: "" });
+                        setTeamForm({ name: "", logoUrl: "" });
                         setTeamStatus(null);
                       }}
                       className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 font-medium text-slate-200"
@@ -308,6 +401,27 @@ export default function AdminDashboardPage() {
                     placeholder="player@ltm.local"
                     required
                   />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label htmlFor="player-profile-image" className="mb-2 block text-sm font-medium text-slate-300">
+                    Profile Image URL
+                  </label>
+                  <input
+                    id="player-profile-image"
+                    value={playerForm.profileImageUrl}
+                    onChange={(event) => setPlayerForm({ ...playerForm, profileImageUrl: event.target.value })}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none transition focus:border-emerald-500"
+                    placeholder="/images/default-player.svg"
+                  />
+                  <div className="mt-3 flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/70 p-2">
+                    <img
+                      src={playerForm.profileImageUrl || "/images/default-player.svg"}
+                      alt="Player profile preview"
+                      className="h-12 w-12 rounded-full object-cover"
+                    />
+                    <span className="text-xs text-slate-400">Defaults to the player avatar</span>
+                  </div>
                 </div>
 
                 <div>
@@ -439,6 +553,7 @@ export default function AdminDashboardPage() {
                           totalRuns: "",
                           totalWickets: "",
                           teamId: "",
+                          profileImageUrl: "",
                         });
                         setPlayerStatus(null);
                       }}
@@ -525,6 +640,106 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
+      <div className="mt-10 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-white">Tickets & Updates</h2>
+            <span className="text-xs uppercase tracking-[0.2em] text-amber-400">Review</span>
+          </div>
+
+          <div className="space-y-3">
+            {tickets.length === 0 ? (
+              <p className="text-sm text-slate-400">No stat upgrade tickets yet.</p>
+            ) : (
+              tickets.map((ticket) => (
+                <div key={ticket.id} className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-white">{ticket.player?.name ?? "Player"}</p>
+                      <p className="text-xs text-slate-400">{ticket.fieldName ?? "Stat"}: {ticket.currentValue ?? "0"} → {ticket.requestedValue ?? "0"}</p>
+                    </div>
+                    <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-amber-300">
+                      {ticket.status ?? "PENDING"}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-sm text-slate-300">{ticket.reason ?? "No reason provided."}</p>
+                  <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-400">
+                    <span>{ticket.requestedBy?.name ?? ticket.requestedBy?.email ?? "Player"}</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleTicketAction(ticket.id, "APPROVED")}
+                        className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-[10px] uppercase tracking-[0.2em] text-emerald-200"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleTicketAction(ticket.id, "REJECTED")}
+                        className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[10px] uppercase tracking-[0.2em] text-rose-200"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <form onSubmit={handleProfileSubmit} className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-white">Account Details</h2>
+            <span className="text-xs uppercase tracking-[0.2em] text-violet-400">Update</span>
+          </div>
+
+          <div className="space-y-5">
+            <div>
+              <label htmlFor="profile-email" className="mb-2 block text-sm font-medium text-slate-300">
+                Email Address
+              </label>
+              <input
+                id="profile-email"
+                type="email"
+                value={profileForm.email}
+                onChange={(event) => setProfileForm({ ...profileForm, email: event.target.value })}
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none transition focus:border-violet-500"
+                placeholder="admin@ltm.com"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="profile-password" className="mb-2 block text-sm font-medium text-slate-300">
+                New Password
+              </label>
+              <input
+                id="profile-password"
+                type="password"
+                value={profileForm.password}
+                onChange={(event) => setProfileForm({ ...profileForm, password: event.target.value })}
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2.5 text-white outline-none transition focus:border-violet-500"
+                placeholder="New password"
+              />
+            </div>
+
+            {profileStatus ? (
+              <div className={`rounded-xl border px-3 py-2 text-sm ${profileStatus.type === "success" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-rose-500/30 bg-rose-500/10 text-rose-200"}`}>
+                {profileStatus.message}
+              </div>
+            ) : null}
+
+            <button
+              type="submit"
+              disabled={isSubmittingProfile}
+              className="w-full rounded-xl bg-violet-500 px-4 py-3 font-semibold text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSubmittingProfile ? "Saving profile..." : "Save profile"}
+            </button>
+          </div>
+        </form>
+      </div>
+
       <div className="mt-10 grid gap-8 lg:grid-cols-2">
         <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
           <div className="mb-5 flex items-center justify-between">
@@ -537,22 +752,37 @@ export default function AdminDashboardPage() {
               <p className="text-sm text-slate-400">No teams yet.</p>
             ) : (
               teams.map((team) => (
-                <div key={team.id} className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                  <div>
-                    <p className="font-semibold text-white">{team.name}</p>
-                    <p className="text-xs text-slate-400">{players.filter((player) => player.team?.id === team.id).length} players assigned</p>
+                <div key={team.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={team.logoUrl || "/logo/ltm.jpg"}
+                      alt={`${team.name} logo`}
+                      className="h-11 w-11 rounded-lg object-cover"
+                    />
+                    <div>
+                      <p className="font-semibold text-white">{team.name}</p>
+                      <p className="text-xs text-slate-400">{players.filter((player) => player.team?.id === team.id).length} players assigned</p>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTeamForm({ name: team.name });
-                      setEditingTeamId(team.id);
-                      setTeamStatus(null);
-                    }}
-                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-emerald-500 hover:text-emerald-300"
-                  >
-                    Edit
-                  </button>
+                  <div className="flex gap-2">
+                    <a
+                      href={`/dashboard/team/${team.id}`}
+                      className="rounded-xl border border-cyan-700 bg-cyan-900/30 px-3 py-2 text-sm font-medium text-cyan-200 transition hover:border-cyan-500 hover:text-cyan-300"
+                    >
+                      View details
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTeamForm({ name: team.name, logoUrl: team.logoUrl ?? "" });
+                        setEditingTeamId(team.id);
+                        setTeamStatus(null);
+                      }}
+                      className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-emerald-500 hover:text-emerald-300"
+                    >
+                      Edit
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -571,11 +801,18 @@ export default function AdminDashboardPage() {
             ) : (
               players.map((player) => (
                 <div key={player.id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-                  <div>
-                    <p className="font-semibold text-white">{player.name}</p>
-                    <p className="text-xs text-slate-400">
-                      {player.role ?? "BATSMAN"} · {player.team?.name ?? "Unassigned"}
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={player.profileImageUrl || "/images/default-player.svg"}
+                      alt={`${player.name} profile`}
+                      className="h-11 w-11 rounded-full object-cover"
+                    />
+                    <div>
+                      <p className="font-semibold text-white">{player.name}</p>
+                      <p className="text-xs text-slate-400">
+                        {player.role ?? "BATSMAN"} · {player.team?.name ?? "Unassigned"}
+                      </p>
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -589,6 +826,7 @@ export default function AdminDashboardPage() {
                         totalRuns: String(player.totalRuns ?? 0),
                         totalWickets: String(player.totalWickets ?? 0),
                         teamId: player.team?.id ?? "",
+                        profileImageUrl: player.profileImageUrl ?? "",
                       });
                       setEditingPlayerId(player.id);
                       setPlayerStatus(null);

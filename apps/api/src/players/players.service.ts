@@ -3,7 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -57,6 +57,7 @@ export class PlayersService {
     jerseyNumber?: number;
     battingStyle?: string;
     bowlingStyle?: string;
+    profileImageUrl?: string;
     email: string;
     teamId?: string;
   }) {
@@ -98,6 +99,7 @@ export class PlayersService {
       data: {
         name: data.name,
         role: data.role,
+        profileImageUrl: data.profileImageUrl?.trim() || '/images/default-player.svg',
         basePrice: data.basePrice,
         matchesPlayed: data.matchesPlayed,
         totalRuns: data.totalRuns,
@@ -118,6 +120,7 @@ export class PlayersService {
     id: string,
     data: {
       name?: string;
+      email?: string;
       role?: 'BATSMAN' | 'BOWLER' | 'ALL_ROUNDER' | 'WICKET_KEEPER';
       basePrice?: number;
       matchesPlayed?: number;
@@ -128,13 +131,40 @@ export class PlayersService {
       jerseyNumber?: number;
       battingStyle?: string;
       bowlingStyle?: string;
+      profileImageUrl?: string;
       teamId?: string | null;
     },
   ) {
-    const player = await this.prisma.player.findUnique({ where: { id } });
+    const player = await this.prisma.player.findUnique({
+      where: { id },
+      include: { user: true },
+    });
 
     if (!player) {
       throw new NotFoundException('Player not found.');
+    }
+
+    const numericFields = [
+      data.basePrice,
+      data.matchesPlayed,
+      data.totalRuns,
+      data.totalWickets,
+    ];
+
+    if (numericFields.some((value) => typeof value === 'number' && value < 0)) {
+      throw new BadRequestException('Player numeric fields cannot be negative.');
+    }
+
+    const normalizedEmail = data.email?.trim().toLowerCase();
+
+    if (normalizedEmail && normalizedEmail !== player.user.email) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+
+      if (existingUser && existingUser.id !== player.userId) {
+        throw new BadRequestException('This email is already in use.');
+      }
     }
 
     const nameParts = data.name?.trim().split(/\s+/) ?? [];
@@ -142,17 +172,38 @@ export class PlayersService {
     const derivedLastName =
       data.lastName ?? (nameParts.length > 1 ? nameParts.slice(1).join(' ') : null);
 
+    const { teamId, email: _email, ...playerFields } = data;
+    const normalizedProfileImageUrl = data.profileImageUrl?.trim() || player.profileImageUrl || '/images/default-player.svg';
+
+    const playerUpdateData: Prisma.PlayerUpdateInput = {
+      ...playerFields,
+      profileImageUrl: normalizedProfileImageUrl,
+      ...(data.name && !data.firstName && !data.lastName
+        ? {
+            firstName: derivedFirstName,
+            lastName: derivedLastName,
+          }
+        : {}),
+      ...(teamId !== undefined
+        ? {
+            team: teamId ? { connect: { id: teamId } } : { disconnect: true },
+          }
+        : {}),
+    };
+
+    if (normalizedEmail && normalizedEmail !== player.user.email) {
+      await this.prisma.user.update({
+        where: { id: player.userId },
+        data: {
+          email: normalizedEmail,
+          ...(data.name ? { name: data.name.trim() } : {}),
+        },
+      });
+    }
+
     return this.prisma.player.update({
       where: { id },
-      data: {
-        ...data,
-        ...(data.name && !data.firstName && !data.lastName
-          ? {
-              firstName: derivedFirstName,
-              lastName: derivedLastName,
-            }
-          : {}),
-      },
+      data: playerUpdateData,
       include: { team: true, user: true },
     });
   }

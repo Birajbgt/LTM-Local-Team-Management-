@@ -50,8 +50,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = (await request.json()) as { name?: string };
+    const body = (await request.json()) as { name?: string; logoUrl?: string };
     const name = body.name?.trim();
+    const logoUrl = body.logoUrl?.trim();
 
     if (!name) {
       return NextResponse.json(
@@ -66,7 +67,10 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({
+        name,
+        logoUrl: logoUrl || "/logo/ltm.jpg",
+      }),
     });
 
     const data = (await backendResponse.json().catch(() => ({}))) as {
@@ -105,9 +109,10 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const body = (await request.json()) as { id?: string; name?: string };
+    const body = (await request.json()) as { id?: string; name?: string; logoUrl?: string };
     const teamId = body.id?.trim();
     const name = body.name?.trim();
+    const logoUrl = body.logoUrl?.trim();
 
     if (!teamId) {
       return NextResponse.json(
@@ -129,7 +134,10 @@ export async function PATCH(request: NextRequest) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({
+        name,
+        logoUrl: logoUrl || "/logo/ltm.jpg",
+      }),
     });
 
     const data = (await backendResponse.json().catch(() => ({}))) as {

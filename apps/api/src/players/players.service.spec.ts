@@ -16,10 +16,12 @@ describe('PlayersService', () => {
       user: {
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
       player: {
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
     };
 
@@ -76,5 +78,65 @@ describe('PlayersService', () => {
       }),
     );
     expect(result.id).toBe('player-123');
+  });
+
+  it('rejects negative numeric stats when updating a player', async () => {
+    prisma.player.findUnique.mockResolvedValue({
+      id: 'player-123',
+      userId: 'user-123',
+      user: { email: 'player@test.com' },
+    });
+
+    await expect(
+      service.update('player-123', {
+        basePrice: -500,
+        matchesPlayed: -1,
+        totalRuns: -10,
+        totalWickets: -2,
+      }),
+    ).rejects.toThrow('Player numeric fields cannot be negative.');
+  });
+
+  it('updates the related user and team relation when saving player details', async () => {
+    prisma.player.findUnique.mockResolvedValue({
+      id: 'player-123',
+      userId: 'user-123',
+      user: { email: 'old@test.com' },
+    });
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.update.mockResolvedValue({ id: 'user-123', email: 'new@test.com' });
+    prisma.player.update.mockResolvedValue({
+      id: 'player-123',
+      name: 'New Name',
+      team: { id: 'team-456' },
+      user: { id: 'user-123', email: 'new@test.com' },
+    });
+
+    await expect(
+      service.update('player-123', {
+        name: 'New Name',
+        email: 'new@test.com',
+        role: PlayerRole.BATSMAN,
+        basePrice: 2500,
+        matchesPlayed: 30,
+        totalRuns: 400,
+        totalWickets: 10,
+        teamId: 'team-456',
+      }),
+    ).resolves.toMatchObject({ id: 'player-123' });
+
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'user-123' },
+        data: expect.objectContaining({ email: 'new@test.com', name: 'New Name' }),
+      }),
+    );
+    expect(prisma.player.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          team: { connect: { id: 'team-456' } },
+        }),
+      }),
+    );
   });
 });

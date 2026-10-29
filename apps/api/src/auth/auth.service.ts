@@ -140,4 +140,58 @@ export class AuthService {
       },
     };
   }
+
+  async updateProfile(
+    userId: string,
+    data: { email?: string; password?: string },
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found.');
+    }
+
+    const nextEmail = data.email?.trim().toLowerCase();
+
+    if (nextEmail && nextEmail !== user.email) {
+      const existing = await this.prisma.user.findUnique({
+        where: { email: nextEmail },
+      });
+
+      if (existing && existing.id !== userId) {
+        throw new ConflictException('A user with this email already exists.');
+      }
+    }
+
+    const passwordHash = data.password && data.password.trim().length >= 6
+      ? await bcrypt.hash(data.password.trim(), 10)
+      : undefined;
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(nextEmail ? { email: nextEmail } : {}),
+        ...(passwordHash ? { password: passwordHash } : {}),
+      },
+    });
+
+    const token = await this.jwtService.signAsync({
+      sub: updatedUser.id,
+      email: updatedUser.email,
+      name: updatedUser.name,
+      role: updatedUser.role,
+    });
+
+    return {
+      accessToken: token,
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        role: updatedUser.role,
+      },
+    };
+  }
 }

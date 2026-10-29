@@ -94,6 +94,11 @@ class CreatePlayerDto {
   @IsString()
   @ApiProperty({ example: 'team-123', required: false })
   teamId?: string;
+
+  @IsOptional()
+  @IsString()
+  @ApiProperty({ example: '/images/default-player.svg', required: false })
+  profileImageUrl?: string;
 }
 
 class UpdatePlayerDto {
@@ -101,6 +106,11 @@ class UpdatePlayerDto {
   @IsString()
   @ApiProperty({ example: 'Aiden Brooks', required: false })
   name?: string;
+
+  @IsOptional()
+  @IsEmail()
+  @ApiProperty({ example: 'aiden@ltm.local', required: false })
+  email?: string;
 
   @IsOptional()
   @IsEnum(PlayerRole)
@@ -140,6 +150,11 @@ class UpdatePlayerDto {
   @IsString()
   @ApiProperty({ example: 'team-123', required: false })
   teamId?: string;
+
+  @IsOptional()
+  @IsString()
+  @ApiProperty({ example: '/images/default-player.svg', required: false })
+  profileImageUrl?: string;
 }
 
 @ApiTags('Players')

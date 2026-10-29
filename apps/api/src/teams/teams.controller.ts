@@ -28,6 +28,11 @@ class CreateTeamDto {
   @IsNotEmpty()
   @ApiProperty({ example: 'River City FC' })
   name: string;
+
+  @IsOptional()
+  @IsString()
+  @ApiProperty({ example: '/logo/ltm.jpg', required: false })
+  logoUrl?: string;
 }
 
 class UpdateTeamDto {
@@ -35,6 +40,11 @@ class UpdateTeamDto {
   @IsString()
   @ApiProperty({ example: 'Harbor United FC', required: false })
   name?: string;
+
+  @IsOptional()
+  @IsString()
+  @ApiProperty({ example: '/logo/ltm.jpg', required: false })
+  logoUrl?: string;
 }
 
 @ApiTags('Teams')
@@ -67,7 +77,7 @@ export class TeamsController {
   @ApiOperation({ summary: 'Create a new team or club' })
   @ApiResponse({ status: 201, description: 'Team created successfully.' })
   async create(@Body() body: CreateTeamDto) {
-    return this.teamsService.create(body.name);
+    return this.teamsService.create(body.name, body.logoUrl);
   }
 
   @Patch(':id')

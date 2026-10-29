@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       totalRuns?: number;
       totalWickets?: number;
       teamId?: string;
+      profileImageUrl?: string;
     };
 
     if (!body.name?.trim() || !body.email?.trim() || !body.role) {
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
         totalRuns: Number(body.totalRuns ?? 0),
         totalWickets: Number(body.totalWickets ?? 0),
         teamId: body.teamId?.trim() || undefined,
+        profileImageUrl: body.profileImageUrl?.trim() || "/images/default-player.svg",
       }),
     });
 
@@ -132,6 +134,7 @@ export async function PATCH(request: NextRequest) {
       totalRuns?: number;
       totalWickets?: number;
       teamId?: string;
+      profileImageUrl?: string;
     };
 
     const playerId = body.id?.trim();
@@ -153,6 +156,7 @@ export async function PATCH(request: NextRequest) {
     if (body.totalWickets !== undefined) payload.totalWickets = Number(body.totalWickets);
     if (body.teamId !== undefined) payload.teamId = body.teamId?.trim() || null;
     if (body.email?.trim()) payload.email = body.email.trim().toLowerCase();
+    if (body.profileImageUrl !== undefined) payload.profileImageUrl = body.profileImageUrl?.trim() || "/images/default-player.svg";
 
     const backendResponse = await fetch(`${API_BASE_URL}/api/players/${playerId}`, {
       method: "PATCH",

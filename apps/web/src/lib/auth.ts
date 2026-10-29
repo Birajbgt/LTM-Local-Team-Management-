@@ -69,8 +69,8 @@ export function isAuthorizedForRoute(pathname: string, role: UserRole) {
   const routeMap: Record<string, UserRole[]> = {
     "/dashboard": ["admin", "team", "player"],
     "/dashboard/admin": ["admin"],
-    "/dashboard/team": ["admin", "team"],
-    "/dashboard/player": ["admin", "player"],
+    "/dashboard/team": ["team"],
+    "/dashboard/player": ["player"],
   };
 
   const match = Object.entries(routeMap).find(

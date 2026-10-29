@@ -7,27 +7,141 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  ADMIN
+  TEAM
+  PLAYER
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  COMPLETED
+  ABANDONED
+  CANCELLED
+}
+
+enum PlayerRole {
+  BATSMAN
+  BOWLER
+  ALL_ROUNDER
+  WICKET_KEEPER
+}
+
+enum UpgradeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String               @id @default(cuid())
+  email            String               @unique
+  password         String
+  name             String
+  role             UserRole             @default(PLAYER)
+  teamId           String?
+  team             Team?                @relation("TeamMembers", fields: [teamId], references: [id])
+  player           Player?
+  requestedUpgrades StatUpgradeRequest[] @relation("RequestedByUser")
+  reviewedUpgrades StatUpgradeRequest[] @relation("ReviewedByUser")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 }
 
 model Team {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String   @unique
+  shortName   String?  @unique
+  city        String?
+  coachName   String?
+  users       User[]   @relation("TeamMembers")
+  players     Player[]
+  homeMatches Match[]  @relation("HomeTeam")
+  awayMatches Match[]  @relation("AwayTeam")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Player {
+  id              String                @id @default(cuid())
+  userId          String                @unique
+  user            User                  @relation(fields: [userId], references: [id])
+  teamId          String?
+  team            Team?                 @relation(fields: [teamId], references: [id])
+  name            String
+  role            PlayerRole            @default(BATSMAN)
+  basePrice       Int                   @default(0)
+  matchesPlayed   Int                   @default(0)
+  totalRuns       Int                   @default(0)
+  totalWickets    Int                   @default(0)
+  firstName       String?
+  lastName        String?
+  jerseyNumber    Int?
+  battingStyle    String?
+  bowlingStyle    String?
+  playerStats     PlayerStat[]
+  upgradeRequests StatUpgradeRequest[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 }
 
 model Match {
-  id        String   @id @default(cuid())
-  title     String
-  homeTeam  String
-  awayTeam  String
-  status    String   @default("scheduled")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String      @id @default(cuid())
+  title       String
+  format      String      @default("T20")
+  venue       String
+  scheduledAt DateTime
+  status      MatchStatus @default(SCHEDULED)
+  homeTeamId  String
+  awayTeamId  String
+  homeTeam    Team        @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam    Team        @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  playerStats PlayerStat[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([homeTeamId, awayTeamId, scheduledAt])
+}
+
+model PlayerStat {
+  id            String   @id @default(cuid())
+  playerId      String
+  player        Player   @relation(fields: [playerId], references: [id])
+  matchId       String?
+  match         Match?   @relation(fields: [matchId], references: [id])
+  runs          Int      @default(0)
+  ballsFaced    Int      @default(0)
+  fours         Int      @default(0)
+  sixes         Int      @default(0)
+  strikeRate    Float    @default(0)
+  wickets       Int      @default(0)
+  oversBowled   Float    @default(0)
+  maidens       Int      @default(0)
+  runsConceded  Int      @default(0)
+  economy       Float    @default(0)
+  catches       Int      @default(0)
+  stumpings     Int      @default(0)
+  notOut        Boolean  @default(false)
+  rating        Float    @default(0)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model StatUpgradeRequest {
+  id             String       @id @default(cuid())
+  playerId       String
+  player         Player       @relation(fields: [playerId], references: [id])
+  requestedById  String
+  requestedBy    User         @relation("RequestedByUser", fields: [requestedById], references: [id])
+  reviewedById   String?
+  reviewedBy     User?        @relation("ReviewedByUser", fields: [reviewedById], references: [id])
+  fieldName      String
+  currentValue   String
+  requestedValue String
+  reason         String
+  status         UpgradeStatus @default(PENDING)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
